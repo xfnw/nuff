@@ -1,17 +1,14 @@
 /* See LICENSE file for copyright and license details. */
 #include <sys/types.h>
 #include <arpa/inet.h>
-
 #include <errno.h>
-#include <fcntl.h>
 #include <math.h>
-#include <regex.h>
+#include <png.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <X11/keysym.h>
 #include <X11/XKBlib.h>
 #include <X11/Xatom.h>
@@ -32,7 +29,9 @@ char *argv0;
 
 typedef enum {
 	NONE = 0,
-	SCALED = 1,
+	LOADED = 1,
+	SCALED = 2,
+	DRAWN = 4
 } imgstate;
 
 typedef struct {
@@ -40,13 +39,11 @@ typedef struct {
 	unsigned int bufwidth, bufheight;
 	imgstate state;
 	XImage *ximg;
+	FILE *f;
+	png_structp png_ptr;
+	png_infop info_ptr;
 	int numpasses;
 } Image;
-
-typedef struct {
-	char *regex;
-	char *bin;
-} Filter;
 
 typedef struct {
 	unsigned int linecount;
@@ -86,14 +83,17 @@ typedef struct {
 	const Arg arg;
 } Shortcut;
 
-static void fffree(Image *img);
-static void ffload(Slide *s);
-static void ffprepare(Image *img);
-static void ffscale(Image *img);
-static void ffdraw(Image *img);
+
+static Image *pngopen(char *filename);
+static void pngfree(Image *img);
+static int pngread(Image *img);
+static int pngprepare(Image *img);
+static void pngscale(Image *img);
+static void pngdraw(Image *img);
 
 static void getfontsize(Slide *s, unsigned int *width, unsigned int *height);
 static void cleanup(int slidesonly);
+static void eprintf(const char *, ...);
 static void reload(const Arg *arg);
 static void load(FILE *fp);
 static void advance(const Arg *arg);
@@ -134,129 +134,117 @@ static void (*handler[LASTEvent])(XEvent *) = {
 	[KeyPress] = kpress,
 };
 
-int
-filter(int fd, const char *cmd)
+Image *pngopen(char *filename)
 {
-	int fds[2];
+	FILE *f;
+	unsigned char buf[8];
+	Image *img;
 
-	if (pipe(fds) < 0)
-		die("sent: Unable to create pipe:");
-
-	switch (fork()) {
-	case -1:
-		die("sent: Unable to fork:");
-	case 0:
-		dup2(fd, 0);
-		dup2(fds[1], 1);
-		close(fds[0]);
-		close(fds[1]);
-		execlp("sh", "sh", "-c", cmd, (char *)0);
-		fprintf(stderr, "sent: execlp sh -c '%s': %s\n", cmd, strerror(errno));
-		_exit(1);
+	if (!(f = fopen(filename, "rb"))) {
+		eprintf("Unable to open file %s:", filename);
+		return NULL;
 	}
-	close(fds[1]);
-	return fds[0];
+
+	if (fread(buf, 1, 8, f) != 8 || png_sig_cmp(buf, 1, 8))
+		return NULL;
+
+	img = malloc(sizeof(Image));
+	memset(img, 0, sizeof(Image));
+	if (!(img->png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL,
+					NULL, NULL))) {
+		free(img);
+		return NULL;
+	}
+	if (!(img->info_ptr = png_create_info_struct(img->png_ptr))
+	    || setjmp(png_jmpbuf(img->png_ptr))) {
+		pngfree(img);
+		return NULL;
+	}
+
+	img->f = f;
+	rewind(f);
+	png_init_io(img->png_ptr, f);
+	png_read_info(img->png_ptr, img->info_ptr);
+	img->bufwidth = png_get_image_width(img->png_ptr, img->info_ptr);
+	img->bufheight = png_get_image_height(img->png_ptr, img->info_ptr);
+
+	return img;
 }
 
-void
-fffree(Image *img)
+void pngfree(Image *img)
 {
+	png_destroy_read_struct(&img->png_ptr, img->info_ptr ? &img->info_ptr : NULL, NULL);
 	free(img->buf);
 	if (img->ximg)
 		XDestroyImage(img->ximg);
 	free(img);
 }
 
-void
-ffload(Slide *s)
+int pngread(Image *img)
 {
-	uint32_t y, x;
-	uint16_t *row;
-	uint8_t opac, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b;
-	size_t rowlen, off, nbytes, i;
-	ssize_t count;
-	unsigned char hdr[16];
-	char *bin = NULL;
-	char *filename;
-	regex_t regex;
-	int fdin, fdout;
+	unsigned int y;
+	png_bytepp row_pointers;
 
-	if (s->img || !(filename = s->embed) || !s->embed[0])
-		return; /* already done */
+	if (!img)
+		return 0; /* already done */
 
-	for (i = 0; i < LEN(filters); i++) {
-		if (regcomp(&regex, filters[i].regex,
-		            REG_NOSUB | REG_EXTENDED | REG_ICASE)) {
-			fprintf(stderr, "sent: Invalid regex '%s'\n", filters[i].regex);
-			continue;
-		}
-		if (!regexec(&regex, filename, 0, NULL, 0)) {
-			bin = filters[i].bin;
-			regfree(&regex);
-			break;
-		}
-		regfree(&regex);
-	}
-	if (!bin)
-		die("sent: Unable to find matching filter for '%s'", filename);
+	if (img->state & LOADED)
+		return 2;
+	if (img->buf)
+		free(img->buf);
+	if (!(img->buf = malloc(3 * img->bufwidth * img->bufheight)))
+		return 0;
 
-	if ((fdin = open(filename, O_RDONLY)) < 0)
-		die("sent: Unable to open '%s':", filename);
-
-	if ((fdout = filter(fdin, bin)) < 0)
-		die("sent: Unable to filter '%s':", filename);
-	close(fdin);
-
-	if (read(fdout, hdr, 16) != 16)
-		die("sent: Unable to read filtered file '%s':", filename);
-	if (memcmp("farbfeld", hdr, 8))
-		die("sent: Filtered file '%s' has no valid farbfeld header", filename);
-
-	s->img = ecalloc(1, sizeof(Image));
-	s->img->bufwidth = ntohl(*(uint32_t *)&hdr[8]);
-	s->img->bufheight = ntohl(*(uint32_t *)&hdr[12]);
-
-	if (s->img->buf)
-		free(s->img->buf);
-	/* internally the image is stored in 888 format */
-	s->img->buf = ecalloc(s->img->bufwidth * s->img->bufheight, strlen("888"));
-
-	/* scratch buffer to read row by row */
-	rowlen = s->img->bufwidth * 2 * strlen("RGBA");
-	row = ecalloc(1, rowlen);
-
-	/* extract window background color channels for transparency */
-	bg_r = (sc[ColBg].pixel >> 16) % 256;
-	bg_g = (sc[ColBg].pixel >>  8) % 256;
-	bg_b = (sc[ColBg].pixel >>  0) % 256;
-
-	for (off = 0, y = 0; y < s->img->bufheight; y++) {
-		nbytes = 0;
-		while (nbytes < rowlen) {
-			count = read(fdout, (char *)row + nbytes, rowlen - nbytes);
-			if (count < 0)
-				die("sent: Unable to read from pipe:");
-			nbytes += count;
-		}
-		for (x = 0; x < rowlen / 2; x += 4) {
-			fg_r = ntohs(row[x + 0]) / 257;
-			fg_g = ntohs(row[x + 1]) / 257;
-			fg_b = ntohs(row[x + 2]) / 257;
-			opac = ntohs(row[x + 3]) / 257;
-			/* blend opaque part of image data with window background color to
-			 * emulate transparency */
-			s->img->buf[off++] = (fg_r * opac + bg_r * (255 - opac)) / 255;
-			s->img->buf[off++] = (fg_g * opac + bg_g * (255 - opac)) / 255;
-			s->img->buf[off++] = (fg_b * opac + bg_b * (255 - opac)) / 255;
-		}
+	if (setjmp(png_jmpbuf(img->png_ptr))) {
+		png_destroy_read_struct(&img->png_ptr, &img->info_ptr, NULL);
+		return 0;
 	}
 
-	free(row);
-	close(fdout);
+	{
+		int color_type = png_get_color_type(img->png_ptr, img->info_ptr);
+		int bit_depth = png_get_bit_depth(img->png_ptr, img->info_ptr);
+		if (color_type == PNG_COLOR_TYPE_PALETTE)
+			png_set_expand(img->png_ptr);
+		if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8)
+			png_set_expand(img->png_ptr);
+		if (png_get_valid(img->png_ptr, img->info_ptr, PNG_INFO_tRNS))
+			png_set_expand(img->png_ptr);
+		if (bit_depth == 16)
+			png_set_strip_16(img->png_ptr);
+		if (color_type == PNG_COLOR_TYPE_GRAY
+				|| color_type == PNG_COLOR_TYPE_GRAY_ALPHA)
+			png_set_gray_to_rgb(img->png_ptr);
+
+		png_color_16 my_background = {.red = 0xff, .green = 0xff, .blue = 0xff};
+		png_color_16p image_background;
+
+		if (png_get_bKGD(img->png_ptr, img->info_ptr, &image_background))
+			png_set_background(img->png_ptr, image_background, PNG_BACKGROUND_GAMMA_FILE, 1, 1.0);
+		else
+			png_set_background(img->png_ptr, &my_background, PNG_BACKGROUND_GAMMA_SCREEN, 2, 1.0);
+
+		if (png_get_interlace_type(img->png_ptr, img->info_ptr) == PNG_INTERLACE_ADAM7)
+			img->numpasses = png_set_interlace_handling(img->png_ptr);
+		else
+			img->numpasses = 1;
+		png_read_update_info(img->png_ptr, img->info_ptr);
+	}
+
+	row_pointers = (png_bytepp)malloc(img->bufheight * sizeof(png_bytep));
+	for (y = 0; y < img->bufheight; y++)
+		row_pointers[y] = img->buf + y * img->bufwidth * 3;
+
+	png_read_image(img->png_ptr, row_pointers);
+	free(row_pointers);
+
+	png_destroy_read_struct(&img->png_ptr, &img->info_ptr, NULL);
+	fclose(img->f);
+	img->state |= LOADED;
+
+	return 1;
 }
 
-void
-ffprepare(Image *img)
+int pngprepare(Image *img)
 {
 	int depth = DefaultDepth(xw.dpy, xw.scr);
 	int width = xw.uw;
@@ -278,12 +266,12 @@ ffprepare(Image *img)
 	if (!XInitImage(img->ximg))
 		die("sent: Unable to initiate XImage");
 
-	ffscale(img);
+	pngscale(img);
 	img->state |= SCALED;
+	return 1;
 }
 
-void
-ffscale(Image *img)
+void pngscale(Image *img)
 {
 	unsigned int x, y;
 	unsigned int width = img->ximg->width;
@@ -308,8 +296,7 @@ ffscale(Image *img)
 	}
 }
 
-void
-ffdraw(Image *img)
+void pngdraw(Image *img)
 {
 	int xoffset = (xw.w - img->ximg->width) / 2;
 	int yoffset = (xw.h - img->ximg->height) / 2;
@@ -369,7 +356,7 @@ cleanup(int slidesonly)
 				free(slides[i].lines[j]);
 			free(slides[i].lines);
 			if (slides[i].img)
-				fffree(slides[i].img);
+				pngfree(slides[i].img);
 		}
 		if (!slidesonly) {
 			free(slides);
@@ -378,11 +365,28 @@ cleanup(int slidesonly)
 	}
 }
 
+void eprintf(const char *fmt, ...)
+{
+        va_list ap; 
+
+        fputs("sent: ", stderr);
+
+        va_start(ap, fmt);
+        vfprintf(stderr, fmt, ap);
+        va_end(ap);
+
+        if (fmt[0] != '\0' && fmt[strlen(fmt)-1] == ':') {
+                fputc(' ', stderr);
+                perror(NULL);
+        } else {
+                fputc('\n', stderr);
+        }
+}
+
 void
 reload(const Arg *arg)
 {
 	FILE *fp = NULL;
-	unsigned int i;
 
 	if (!fname) {
 		fprintf(stderr, "sent: Cannot reload from stdin. Use a file!\n");
@@ -398,8 +402,8 @@ reload(const Arg *arg)
 	fclose(fp);
 
 	LIMIT(idx, 0, slidecount-1);
-	for (i = 0; i < slidecount; i++)
-		ffload(&slides[i]);
+	if (slides[idx].img)
+		slides[idx].img->state &= ~(DRAWN | SCALED);
 	xdraw();
 }
 
@@ -448,9 +452,11 @@ load(FILE *fp)
 			if (s->lines[s->linecount][blen-1] == '\n')
 				s->lines[s->linecount][blen-1] = '\0';
 
-			/* mark as image slide if first line of a slide starts with @ */
-			if (s->linecount == 0 && s->lines[0][0] == '@')
-				s->embed = &s->lines[0][1];
+			/* only make image slide if first line of a slide starts with @ */
+			if (s->linecount == 0 && s->lines[0][0] == '@') {
+				memmove(s->lines[0], &s->lines[0][1], blen);
+				s->img = pngopen(s->lines[0]);
+			}
 
 			if (s->lines[s->linecount][0] == '\\')
 				memmove(s->lines[s->linecount], &s->lines[s->linecount][1], blen);
@@ -473,9 +479,13 @@ advance(const Arg *arg)
 	LIMIT(new_idx, 0, slidecount-1);
 	if (new_idx != idx) {
 		if (slides[idx].img)
-			slides[idx].img->state &= ~SCALED;
+			slides[idx].img->state &= ~(DRAWN | SCALED);
 		idx = new_idx;
 		xdraw();
+		if (slidecount > idx + 1 && slides[idx + 1].img && !pngread(slides[idx + 1].img))
+			die("Unable to read image %s.", slides[idx + 1].lines[0]);
+		if (0 < idx && slides[idx - 1].img && !pngread(slides[idx - 1].img))
+			die("Unable to read image %s.", slides[idx - 1].lines[0]);
 	}
 }
 
@@ -538,10 +548,12 @@ xdraw()
 			         slides[idx].lines[i],
 			         0);
 		drw_map(d, xw.win, 0, 0, xw.w, xw.h);
-	} else {
-		if (!(im->state & SCALED))
-			ffprepare(im);
-		ffdraw(im);
+	} else if (!(im->state & LOADED) && !pngread(im)) {
+		eprintf("Unable to read image %s.", slides[idx].lines[0]);
+	} else if (!(im->state & SCALED) && !pngprepare(im)) {
+		eprintf("Unable to prepare image %s for drawing.", slides[idx].lines[0]);
+	} else if (!(im->state & DRAWN)) {
+		pngdraw(im);
 	}
 }
 
@@ -567,7 +579,6 @@ void
 xinit()
 {
 	XTextProperty prop;
-	unsigned int i;
 
 	if (!(xw.dpy = XOpenDisplay(NULL)))
 		die("sent: Unable to open display");
@@ -595,8 +606,6 @@ xinit()
 	XSetWindowBackground(xw.dpy, xw.win, sc[ColBg].pixel);
 
 	xloadfonts();
-	for (i = 0; i < slidecount; i++)
-		ffload(&slides[i]);
 
 	XStringListToTextProperty(&argv0, 1, &prop);
 	XSetWMName(xw.dpy, xw.win, &prop);

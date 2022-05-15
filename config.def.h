@@ -49,8 +49,3 @@ static Shortcut shortcuts[] = {
 	{ XK_r,           reload,         {0} },
 };
 
-static Filter filters[] = {
-	{ "\\.ff$", "cat" },
-	{ "\\.ff.bz2$", "bunzip2" },
-	{ "\\.[a-z0-9]+$", "2ff" },
-};

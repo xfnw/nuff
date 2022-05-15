@@ -38,8 +38,7 @@ with `#` will be ignored. A `\` at the beginning of the line escapes `@` and
 	
 	depends on
 	- Xlib
-	- Xft
-	- farbfeld
+	- libpng
 	
 	sent FILENAME
 	one slide per paragraph

@@ -20,8 +20,7 @@ easy to use
 
 depends on
 ♽ Xlib
-☢ Xft
-☃ farbfeld
+☢ libpng
 
 ~1000 lines of code
 
