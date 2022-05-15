@@ -256,15 +256,15 @@ int pngprepare(Image *img)
 		height = img->bufheight * xw.uw / img->bufwidth;
 
 	if (depth < 24)
-		die("sent: Display color depths < 24 not supported");
+		die("nuff: Display color depths < 24 not supported");
 
 	if (!(img->ximg = XCreateImage(xw.dpy, CopyFromParent, depth, ZPixmap, 0,
 	                               NULL, width, height, 32, 0)))
-		die("sent: Unable to create XImage");
+		die("nuff: Unable to create XImage");
 
 	img->ximg->data = ecalloc(height, img->ximg->bytes_per_line);
 	if (!XInitImage(img->ximg))
-		die("sent: Unable to initiate XImage");
+		die("nuff: Unable to initiate XImage");
 
 	pngscale(img);
 	img->state |= SCALED;
@@ -369,7 +369,7 @@ void eprintf(const char *fmt, ...)
 {
         va_list ap; 
 
-        fputs("sent: ", stderr);
+        fputs("nuff: ", stderr);
 
         va_start(ap, fmt);
         vfprintf(stderr, fmt, ap);
@@ -389,7 +389,7 @@ reload(const Arg *arg)
 	FILE *fp = NULL;
 
 	if (!fname) {
-		fprintf(stderr, "sent: Cannot reload from stdin. Use a file!\n");
+		fprintf(stderr, "nuff: Cannot reload from stdin. Use a file!\n");
 		return;
 	}
 
@@ -397,7 +397,7 @@ reload(const Arg *arg)
 	slidecount = 0;
 
 	if (!(fp = fopen(fname, "r")))
-		die("sent: Unable to open '%s' for reading:", fname);
+		die("nuff: Unable to open '%s' for reading:", fname);
 	load(fp);
 	fclose(fp);
 
@@ -426,7 +426,7 @@ load(FILE *fp)
 
 		if ((slidecount+1) * sizeof(*slides) >= size)
 			if (!(slides = realloc(slides, (size += BUFSIZ))))
-				die("sent: Unable to reallocate %u bytes:", size);
+				die("nuff: Unable to reallocate %u bytes:", size);
 
 		/* read one slide */
 		maxlines = 0;
@@ -443,12 +443,12 @@ load(FILE *fp)
 			if (s->linecount >= maxlines) {
 				maxlines = 2 * s->linecount + 1;
 				if (!(s->lines = realloc(s->lines, maxlines * sizeof(s->lines[0]))))
-					die("sent: Unable to reallocate %u bytes:", maxlines * sizeof(s->lines[0]));
+					die("nuff: Unable to reallocate %u bytes:", maxlines * sizeof(s->lines[0]));
 			}
 
 			blen = strlen(buf);
 			if (!(s->lines[s->linecount] = strdup(buf)))
-				die("sent: Unable to strdup:");
+				die("nuff: Unable to strdup:");
 			if (s->lines[s->linecount][blen-1] == '\n')
 				s->lines[s->linecount][blen-1] = '\0';
 
@@ -469,7 +469,7 @@ load(FILE *fp)
 	}
 
 	if (!slidecount)
-		die("sent: No slides in file");
+		die("nuff: No slides in file");
 }
 
 void
@@ -560,12 +560,12 @@ xdraw()
 void
 xhints()
 {
-	XClassHint class = {.res_name = "sent", .res_class = "presenter"};
+	XClassHint class = {.res_name = "nuff", .res_class = "presenter"};
 	XWMHints wm = {.flags = InputHint, .input = True};
 	XSizeHints *sizeh = NULL;
 
 	if (!(sizeh = XAllocSizeHints()))
-		die("sent: Unable to allocate size hints");
+		die("nuff: Unable to allocate size hints");
 
 	sizeh->flags = PSize;
 	sizeh->height = xw.h;
@@ -581,7 +581,7 @@ xinit()
 	XTextProperty prop;
 
 	if (!(xw.dpy = XOpenDisplay(NULL)))
-		die("sent: Unable to open display");
+		die("nuff: Unable to open display");
 	xw.scr = XDefaultScreen(xw.dpy);
 	xw.vis = XDefaultVisual(xw.dpy, xw.scr);
 	resize(DisplayWidth(xw.dpy, xw.scr), DisplayHeight(xw.dpy, xw.scr));
@@ -600,7 +600,7 @@ xinit()
 	XSetWMProtocols(xw.dpy, xw.win, &xw.wmdeletewin, 1);
 
 	if (!(d = drw_create(xw.dpy, xw.scr, xw.win, xw.w, xw.h)))
-		die("sent: Unable to create drawing context");
+		die("nuff: Unable to create drawing context");
 	sc = drw_scm_create(d, colors, 2);
 	drw_setscheme(d, sc);
 	XSetWindowBackground(xw.dpy, xw.win, sc[ColBg].pixel);
@@ -629,10 +629,10 @@ xloadfonts()
 	for (i = 0; i < NUMFONTSCALES; i++) {
 		for (j = 0; j < LEN(fontfallbacks); j++) {
 			if (MAXFONTSTRLEN < snprintf(fstrs[j], MAXFONTSTRLEN, "%s:size=%d", fontfallbacks[j], FONTSZ(i)))
-				die("sent: Font string too long");
+				die("nuff: Font string too long");
 		}
 		if (!(fonts[i] = drw_fontset_create(d, (const char**)fstrs, LEN(fstrs))))
-			die("sent: Unable to load any font for size %d", FONTSZ(i));
+			die("nuff: Unable to load any font for size %d", FONTSZ(i));
 	}
 
 	for (j = 0; j < LEN(fontfallbacks); j++)
@@ -698,7 +698,7 @@ main(int argc, char *argv[])
 
 	ARGBEGIN {
 	case 'v':
-		fprintf(stderr, "sent-"VERSION"\n");
+		fprintf(stderr, "nuff-"VERSION"\n");
 		return 0;
 	default:
 		usage();
@@ -707,7 +707,7 @@ main(int argc, char *argv[])
 	if (!argv[0] || !strcmp(argv[0], "-"))
 		fp = stdin;
 	else if (!(fp = fopen(fname = argv[0], "r")))
-		die("sent: Unable to open '%s' for reading:", fname);
+		die("nuff: Unable to open '%s' for reading:", fname);
 	load(fp);
 	fclose(fp);
 
