@@ -12,11 +12,11 @@ static char *fontfallbacks[] = {
 #define FONTSZ(x) ((int)(10.0 * powf(1.1288, (x)))) /* x in [0, NUMFONTSCALES-1] */
 
 static const char *colors[] = {
-	"#FFFFFF", /* foreground color */
-	"#000000", /* background color */
+	"#000000", /* foreground color */
+	"#FFFFFF", /* background color */
 };
 
-static const float linespacing = 1.0;
+static const float linespacing = 1.1;
 
 /* how much screen estate is to be used at max for the content */
 static const float usablewidth = 0.75;
