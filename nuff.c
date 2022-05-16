@@ -98,6 +98,7 @@ static void reload(const Arg *arg);
 static void load(FILE *fp);
 static void advance(const Arg *arg);
 static void quit(const Arg *arg);
+static void blank(const Arg *arg);
 static void resize(int width, int height);
 static void run();
 static void usage();
@@ -125,6 +126,7 @@ static Drw *d = NULL;
 static Clr *sc;
 static Fnt *fonts[NUMFONTSCALES];
 static int running = 1;
+static int blanked = 0;
 
 static void (*handler[LASTEvent])(XEvent *) = {
 	[ButtonPress] = bpress,
@@ -504,6 +506,13 @@ quit(const Arg *arg)
 }
 
 void
+blank(const Arg *arg)
+{
+	blanked = !blanked;
+	xdraw();
+}
+
+void
 resize(int width, int height)
 {
 	xw.w = width;
@@ -543,6 +552,12 @@ xdraw()
 
 	getfontsize(&slides[idx], &width, &height);
 	XClearWindow(xw.dpy, xw.win);
+
+	if (blanked) {
+		drw_rect(d, 0, 0, xw.w, xw.h, 1, 0);
+		drw_map(d, xw.win, 0, 0, xw.w, xw.h);
+		return;
+	}
 
 	if (!im) {
 		drw_rect(d, 0, 0, xw.w, xw.h, 1, 1);
