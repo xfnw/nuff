@@ -134,7 +134,8 @@ static void (*handler[LASTEvent])(XEvent *) = {
 	[KeyPress] = kpress,
 };
 
-Image *pngopen(char *filename)
+Image
+*pngopen(char *filename)
 {
 	FILE *f;
 	unsigned char buf[8];
@@ -171,7 +172,8 @@ Image *pngopen(char *filename)
 	return img;
 }
 
-void pngfree(Image *img)
+void
+pngfree(Image *img)
 {
 	png_destroy_read_struct(&img->png_ptr, img->info_ptr ? &img->info_ptr : NULL, NULL);
 	free(img->buf);
@@ -180,18 +182,20 @@ void pngfree(Image *img)
 	free(img);
 }
 
-int pngread(Image *img)
+int
+pngread(Image *img)
 {
 	unsigned int y;
 	png_bytepp row_pointers;
 
 	if (!img)
 		return 0; /* already done */
-
 	if (img->state & LOADED)
 		return 2;
+
 	if (img->buf)
 		free(img->buf);
+
 	if (!(img->buf = malloc(3 * img->bufwidth * img->bufheight)))
 		return 0;
 
@@ -244,7 +248,8 @@ int pngread(Image *img)
 	return 1;
 }
 
-int pngprepare(Image *img)
+int
+pngprepare(Image *img)
 {
 	int depth = DefaultDepth(xw.dpy, xw.scr);
 	int width = xw.uw;
@@ -271,7 +276,8 @@ int pngprepare(Image *img)
 	return 1;
 }
 
-void pngscale(Image *img)
+void
+pngscale(Image *img)
 {
 	unsigned int x, y;
 	unsigned int width = img->ximg->width;
@@ -296,7 +302,8 @@ void pngscale(Image *img)
 	}
 }
 
-void pngdraw(Image *img)
+void
+pngdraw(Image *img)
 {
 	int xoffset = (xw.w - img->ximg->width) / 2;
 	int yoffset = (xw.h - img->ximg->height) / 2;
@@ -365,7 +372,8 @@ cleanup(int slidesonly)
 	}
 }
 
-void eprintf(const char *fmt, ...)
+void
+eprintf(const char *fmt, ...)
 {
         va_list ap; 
 
@@ -714,9 +722,9 @@ main(int argc, char *argv[])
 		fp = stdin;
 	else if (!(fp = fopen(fname = argv[0], "r")))
 		die("nuff: Unable to open '%s' for reading:", fname);
+
 	load(fp);
 	fclose(fp);
-
 	xinit();
 	run();
 
