@@ -628,6 +628,11 @@ xinit()
 	xw.netwmname = XInternAtom(xw.dpy, "_NET_WM_NAME", False);
 	XSetWMProtocols(xw.dpy, xw.win, &xw.wmdeletewin, 1);
 
+	/* request fullscreen from wm */
+	Atom netwmstate = XInternAtom(xw.dpy, "_NET_WM_STATE", True);
+	Atom netwmstatefullscreen = XInternAtom(xw.dpy, "_NET_WM_STATE_FULLSCREEN", True);
+	XChangeProperty(xw.dpy, xw.win, netwmstate, XA_ATOM, 32, PropModeReplace, (unsigned char *)&netwmstatefullscreen, 1);
+
 	if (!(d = drw_create(xw.dpy, xw.scr, xw.win, xw.w, xw.h)))
 		die("nuff: Unable to create drawing context");
 	sc = drw_scm_create(d, colors, 2);
