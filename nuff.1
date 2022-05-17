@@ -1,22 +1,21 @@
-.Dd 2016-08-12
+.Dd May 16, 2022
 .Dt nuff 1
+.
 .Sh NAME
 .Nm nuff
-.Nd simple plaintext presentation tool
+.Nd fork of a simple plaintext presentation tool
+.
 .Sh SYNOPSIS
 .Nm
 .Op Fl v
 .Op Ar file
+.
 .Sh DESCRIPTION
 .Nm
-is a simple plain text presentation tool for X. nuff does not need LaTeX,
-LibreOffice or any other fancy file format. Instead, nuff reads plain text
-describing the slides. nuff can also draw images.
+is a simple plain text presentation tool for X.
 .Pp
-Every paragraph represents a slide in the presentation. Especially for
-presentations using the Takahashi method this is very nice and allows
-you to write the presentation for a quick lightning talk within a
-few minutes.
+every paragraph represents a slide in the presentation.
+.
 .Sh OPTIONS
 .Bl -tag -width Ds
 .It Fl v
@@ -37,12 +36,15 @@ Go to previous slide, if existent.
 Quit.
 .It Sy r
 Reload the slides. Only works on file input.
+.It Sy b
+Toggle blank
 .It Sy Right | Return | Space | l | j | Down | Next | n
 Go to next slide, if existent.
 .It Sy Left | Backspace | h | k | Up | Prior | p
 Go to previous slide, if existent.
 .El
 .El
+.
 .Sh FORMAT
 The presentation file is made up of at least one paragraph, with an
 empty line separating two slides.
