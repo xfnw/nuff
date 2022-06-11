@@ -33,14 +33,13 @@ cscope: ${SRC} config.h
 
 clean:
 	@echo cleaning
-	@rm -f nuff ${OBJ} nuff-${VERSION}.tar.gz
+	@rm -f nuff ${OBJ} nuff-${VERSION}.tar.zst
 
 dist: clean
 	@echo creating dist tarball
 	@mkdir -p nuff-${VERSION}
 	@cp -R LICENSE Makefile config.mk config.def.h ${SRC} nuff-${VERSION}
-	@tar -cf nuff-${VERSION}.tar nuff-${VERSION}
-	@gzip nuff-${VERSION}.tar
+	@tar -caf nuff-${VERSION}.tar.zst nuff-${VERSION}
 	@rm -rf nuff-${VERSION}
 
 install: all
