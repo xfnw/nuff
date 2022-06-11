@@ -634,7 +634,8 @@ xinit()
 	xw.netwmname = XInternAtom(xw.dpy, "_NET_WM_NAME", False);
 	XSetWMProtocols(xw.dpy, xw.win, &xw.wmdeletewin, 1);
 
-	/* request fullscreen from wm */
+	/* request fullscreen from wm                */
+	/* TODO: make this toggleable with a keybind */
 	Atom netwmstate = XInternAtom(xw.dpy, "_NET_WM_STATE", True);
 	Atom netwmstatefullscreen = XInternAtom(xw.dpy, "_NET_WM_STATE_FULLSCREEN", True);
 	XChangeProperty(xw.dpy, xw.win, netwmstate, XA_ATOM, 32, PropModeReplace, (unsigned char *)&netwmstatefullscreen, 1);
