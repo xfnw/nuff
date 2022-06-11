@@ -40,7 +40,8 @@ clean:
 dist: clean
 	@echo creating dist tarball
 	@mkdir -p nuff-${VERSION}
-	@cp -R LICENSE Makefile config.mk config.def.h ${SRC} nuff-${VERSION}
+	@cp -R LICENSE Makefile config.def.h ${SRC} nuff-${VERSION}
+	@sed 's/unknown/${VERSION}/' config.mk > nuff-${VERSION}/config.mk
 	@tar -caf nuff-${VERSION}.tar.zst nuff-${VERSION}
 	@rm -rf nuff-${VERSION}
 
