@@ -148,19 +148,23 @@ Image
 		return NULL;
 	}
 
-	if (fread(buf, 1, 8, f) != 8 || png_sig_cmp(buf, 1, 8))
+	if (fread(buf, 1, 8, f) != 8 || png_sig_cmp(buf, 1, 8)) {
+		fclose(f);
 		return NULL;
+	}
 
 	img = malloc(sizeof(Image));
 	memset(img, 0, sizeof(Image));
 	if (!(img->png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL,
 					NULL, NULL))) {
 		free(img);
+		fclose(f);
 		return NULL;
 	}
 	if (!(img->info_ptr = png_create_info_struct(img->png_ptr))
 	    || setjmp(png_jmpbuf(img->png_ptr))) {
 		pngfree(img);
+		fclose(f);
 		return NULL;
 	}
 
