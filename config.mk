@@ -1,5 +1,5 @@
 # nuff version
-VERSION = 1
+VERSION ?= unknown
 
 # Customize below to fit your system
 
