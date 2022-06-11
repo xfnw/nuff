@@ -28,8 +28,10 @@ nuff: ${OBJ}
 	@${CC} -o $@ ${OBJ} ${LDFLAGS}
 
 cscope: ${SRC} config.h
-	@echo cScope
-	@cscope -R -b || echo cScope not installed
+	cscope -R -b
+
+check: ${SRC}
+	cppcheck ${SRC}
 
 clean:
 	@echo cleaning
@@ -56,4 +58,4 @@ uninstall:
 	@echo removing executable file from ${DESTDIR}${PREFIX}/bin
 	@rm -f ${DESTDIR}${PREFIX}/bin/nuff
 
-.PHONY: all options clean dist install uninstall cscope
+.PHONY: all options clean dist install uninstall cscope check
