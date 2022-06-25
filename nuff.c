@@ -644,6 +644,22 @@ xinit()
 	Atom netwmstatefullscreen = XInternAtom(xw.dpy, "_NET_WM_STATE_FULLSCREEN", True);
 	XChangeProperty(xw.dpy, xw.win, netwmstate, XA_ATOM, 32, PropModeReplace, (unsigned char *)&netwmstatefullscreen, 1);
 
+	/* make cursor invisible while over nuff */
+	/* largely based on https://stackoverflow.com/a/664528/9406294 */
+	{
+		Cursor invisCursor;
+		Pixmap bitmapNoData;
+		XColor black;
+		static char noData[] = { 0,0,0,0,0,0,0,0 };
+		black.red = black.green = black.blue = 0;
+
+		bitmapNoData = XCreateBitmapFromData(xw.dpy, xw.win, noData, 8, 8);
+		invisCursor = XCreatePixmapCursor(xw.dpy, bitmapNoData, bitmapNoData, &black, &black, 0, 0);
+		XDefineCursor(xw.dpy, xw.win, invisCursor);
+		XFreeCursor(xw.dpy, invisCursor);
+		XFreePixmap(xw.dpy, bitmapNoData);
+	}
+
 	if (!(d = drw_create(xw.dpy, xw.scr, xw.win, xw.w, xw.h)))
 		die("nuff: Unable to create drawing context");
 	sc = drw_scm_create(d, colors, 2);
