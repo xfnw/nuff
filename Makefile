@@ -31,7 +31,7 @@ cscope: ${SRC} config.h
 	cscope -R -b
 
 check: ${SRC}
-	cppcheck ${SRC}
+	cppcheck --enable=all --suppress=missingIncludeSystem ${SRC}
 
 clean:
 	@echo cleaning
