@@ -319,7 +319,6 @@ void
 getfontsize(Slide *s, unsigned int *width, unsigned int *height)
 {
 	int i, j;
-	unsigned int curw, newmax;
 	float lfac = linespacing * (s->linecount - 1) + 1;
 
 	/* fit height */
@@ -332,8 +331,8 @@ getfontsize(Slide *s, unsigned int *width, unsigned int *height)
 	/* fit width */
 	*width = 0;
 	for (i = 0; i < s->linecount; i++) {
-		curw = drw_fontset_getwidth(d, s->lines[i]);
-		newmax = (curw >= *width);
+		unsigned int curw = drw_fontset_getwidth(d, s->lines[i]);
+		unsigned int newmax = (curw >= *width);
 		while (j > 0 && curw > xw.uw) {
 			drw_setfontset(d, fonts[--j]);
 			curw = drw_fontset_getwidth(d, s->lines[i]);
@@ -347,7 +346,7 @@ getfontsize(Slide *s, unsigned int *width, unsigned int *height)
 void
 cleanup(int slidesonly)
 {
-	unsigned int i, j;
+	unsigned int i;
 
 	if (!slidesonly) {
 		for (i = 0; i < NUMFONTSCALES; i++)
@@ -362,6 +361,8 @@ cleanup(int slidesonly)
 
 	if (slides) {
 		for (i = 0; i < slidecount; i++) {
+			unsigned int j;
+
 			for (j = 0; j < slides[i].linecount; j++)
 				free(slides[i].lines[j]);
 			free(slides[i].lines);
@@ -422,12 +423,15 @@ void
 load(FILE *fp)
 {
 	static size_t size = 0;
-	size_t blen, maxlines;
-	char buf[BUFSIZ], *p;
+	size_t blen;
+	char buf[BUFSIZ];
 	Slide *s;
 
 	/* read each line from fp and add it to the item list */
 	while (1) {
+		size_t maxlines = 0;
+		char *p;
+
 		/* eat consecutive empty lines */
 		while ((p = fgets(buf, sizeof(buf), fp)))
 			if (strcmp(buf, "\n") != 0 && buf[0] != '#')
@@ -446,7 +450,6 @@ load(FILE *fp)
 		}
 
 		/* read one slide */
-		maxlines = 0;
 		memset((s = &slides[slidecount]), 0, sizeof(Slide));
 		do {
 			/* if there's a leading null, we can't do blen-1 */
@@ -554,7 +557,7 @@ run()
 void
 xdraw()
 {
-	unsigned int height, width, i;
+	unsigned int height, width;
 	Image *im = slides[idx].img;
 
 	getfontsize(&slides[idx], &width, &height);
@@ -567,6 +570,8 @@ xdraw()
 	}
 
 	if (!im) {
+		unsigned int i;
+
 		drw_rect(d, 0, 0, xw.w, xw.h, 1, 1);
 		for (i = 0; i < slides[idx].linecount; i++)
 			drw_text(d,
