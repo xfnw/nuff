@@ -21,6 +21,7 @@
 #include "drw.h"
 
 char *argv0;
+int fskip = 0;
 
 /* macros */
 #define LEN(a)         (sizeof(a) / sizeof(a)[0])
@@ -685,22 +686,22 @@ xloadfonts()
 	int i, j;
 	char *fstrs[LEN(fontfallbacks)];
 
-	for (j = 0; j < LEN(fontfallbacks); j++) {
-		fstrs[j] = ecalloc(1, MAXFONTSTRLEN);
+	for (j = fskip; j < LEN(fontfallbacks); j++) {
+		fstrs[j-fskip] = ecalloc(1, MAXFONTSTRLEN);
 	}
 
 	for (i = 0; i < NUMFONTSCALES; i++) {
-		for (j = 0; j < LEN(fontfallbacks); j++) {
-			if (MAXFONTSTRLEN < snprintf(fstrs[j], MAXFONTSTRLEN, "%s:size=%d", fontfallbacks[j], FONTSZ(i)))
+		for (j = fskip; j < LEN(fontfallbacks); j++) {
+			if (MAXFONTSTRLEN < snprintf(fstrs[j-fskip], MAXFONTSTRLEN, "%s:size=%d", fontfallbacks[j], FONTSZ(i-fskip)))
 				die("nuff: Font string too long");
 		}
-		if (!(fonts[i] = drw_fontset_create(d, (const char**)fstrs, LEN(fstrs))))
+		if (!(fonts[i] = drw_fontset_create(d, (const char**)fstrs, LEN(fstrs)-fskip)))
 			die("nuff: Unable to load any font for size %d", FONTSZ(i));
 	}
 
-	for (j = 0; j < LEN(fontfallbacks); j++)
-		if (fstrs[j])
-			free(fstrs[j]);
+	for (j = fskip; j < LEN(fontfallbacks); j++)
+		if (fstrs[j-fskip])
+			free(fstrs[j-fskip]);
 }
 
 void
@@ -751,7 +752,7 @@ configure(XEvent *e)
 void
 usage()
 {
-	die("usage: %s [file]", argv0);
+	die("usage: %s [-r] [-f fskip] [-p pheight] [file]", argv0);
 }
 
 int
@@ -760,6 +761,19 @@ main(int argc, char *argv[])
 	FILE *fp = NULL;
 
 	ARGBEGIN {
+	case 'f':
+		fskip = atoi(EARGF(usage()));
+		break;
+	case 'p':
+		progressheight = atoi(EARGF(usage()));
+		break;
+	case 'r':
+		{
+			char *swap = *colors;
+			*colors = colors[1];
+			colors[1] = swap;
+		}
+		break;
 	case 'v':
 		fprintf(stderr, "nuff-"VERSION"\n");
 		return 0;

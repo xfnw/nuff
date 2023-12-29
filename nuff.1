@@ -7,8 +7,12 @@
 .
 .Sh SYNOPSIS
 .Nm
-.Op Fl v
+.Op Fl r
+.Op Fl f Ar fskip
+.Op Fl p Ar pheight
 .Op Ar file
+.Nm
+.Fl v
 .
 .Sh DESCRIPTION
 .Nm
@@ -18,6 +22,18 @@ every paragraph represents a slide in the presentation.
 .
 .Sh OPTIONS
 .Bl -tag -width Ds
+.It Fl f Ar fskip
+Skip
+.Ar fskip
+number of fonts from the font fallback list.
+.It Fl p Ar pheight
+Set the height of the progress bar to
+.Ar pheight
+pixels, or
+.Cm 0
+to disable.
+.It Fl r
+Swap colors to reverse-video.
 .It Fl v
 Print version information to stdout and exit.
 .El
